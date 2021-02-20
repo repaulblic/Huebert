@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace Huebert
 {
-    public class Worker : BackgroundService
+    public class Hubert : BackgroundService
     {
-        private readonly ILogger<Worker> _logger;
+        private readonly ILogger<Hubert> _logger;
 
-        public Worker(ILogger<Worker> logger)
+        public Hubert(ILogger<Hubert> logger)
         {
             _logger = logger;
         }
