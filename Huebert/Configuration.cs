@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace Huebert
@@ -22,7 +23,31 @@ namespace Huebert
         /// <summary>
         /// Light schedules
         /// </summary>
-        public Schedule[] Schedules { get; set; }
+        public List<Schedule> Schedules { get; set; }
+
+        public static Configuration LoadConfiguration()
+        {
+            var config = new Configuration();
+            if (File.Exists("HuebertConfig.json"))
+            {
+                try
+                {
+                    var jsonStr = File.ReadAllText("HuebertConfig.json");
+                    config = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(jsonStr);
+                }
+                catch(Newtonsoft.Json.JsonSerializationException)
+                {
+                    //Malformed file, save bad file and create new one
+                    //File.Move("HuebertConfig.json", $"HuebertConfig_{DateTime.Now}.json");
+                }
+            }
+            config = config ?? new Configuration();
+            config.BridgeInfo = config?.BridgeInfo ?? new BridgeInfo();
+            config.Location = config?.Location ?? new Location();
+            config.Schedules = config?.Schedules ?? new List<Schedule>();
+
+            return config;
+        }
     }
 
     public class BridgeInfo
@@ -43,12 +68,12 @@ namespace Huebert
         /// <summary>
         /// Latitude
         /// </summary>
-        public long? Lat { get; set; }
+        public float? Lat { get; set; }
 
         /// <summary>
         /// Longitude
         /// </summary>
-        public long? Lon { get; set; }
+        public float? Lon { get; set; }
 
         /// <summary>
         /// Location name
