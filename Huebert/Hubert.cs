@@ -19,6 +19,7 @@ namespace Huebert
     {
         private readonly ILogger<Hubert> _logger;
         private ILocalHueClient _hueClient;
+        private SimpleSunsetService _sunsetService;
         public Hubert(ILogger<Hubert> logger)
         {
             _logger = logger;
@@ -67,10 +68,26 @@ namespace Huebert
             //TODO: Verify schedules
             //TODO: Generate default schedules when none exist
 
+            //Generate simple schedule
+            if (config.SimpleSchedule == null || !config.SimpleSchedule.IsValid())
+            {
+                var lights = await _hueClient.GetLightsAsync();
+                config.SimpleSchedule.DeviceIds = lights.Select(i => i.Id).ToArray();
+                config.SimpleSchedule.Name = "Default simple schedule";
+                config.SimpleSchedule.DayColorTemperature = 5000;
+                config.SimpleSchedule.SunsetColorTemperature = 2700;
+                config.SimpleSchedule.Brightness = 100;
+            }
+
+            SaveConfig(config);
+
+            _sunsetService = new SimpleSunsetService(_logger, _hueClient, config);
+
+
             while (!stoppingToken.IsCancellationRequested)
             {
-                await WriteLightsToLogger();
-                await Task.Delay(10000, stoppingToken);
+                //await WriteLightsToLogger();
+                //await Task.Delay(10000, stoppingToken);
 
             }
         }
@@ -79,25 +96,25 @@ namespace Huebert
         {
             var lights = await _hueClient.GetLightsAsync();
 
-            StringBuilder sb = new StringBuilder(); 
-            var header = string.Format("{0,-16}|{1,16}|{2,8}|{3,12}|{4,12}|{5,16}|{6,10}", "Name", "Temperature", "Hue", "Saturation", "Brightness", "Color Coords", "Hex Color");
+            StringBuilder sb = new StringBuilder();
+            var header = string.Format("{0,-16}|{7, 3}|{1,16}|{2,8}|{3,12}|{4,12}|{5,16}|{6,10}", "Name", "Temperature", "Hue", "Saturation", "Brightness", "Color Coords", "Hex Color", "ID");
 
             sb.AppendLine(header);
             sb.AppendLine(String.Concat(Enumerable.Repeat("-", header.Length)));
-
             foreach (var light in lights)
             {
                 var rgbColor = light.State.ToRGBColor();
                 string rgbString = $"[{rgbColor.R},{rgbColor.G},{rgbColor.B}]";
 
-                sb.AppendLine(string.Format("{0,-16}|{1,16}|{2,8}|{3,12}|{4,12}|{5,16}|{6,10}",
+                sb.AppendLine(string.Format("{0,-16}|{7, 3}|{1,16}|{2,8}|{3,12}|{4,12}|{5,16}|{6,10}",
                         light.Name,
                         light.State.ColorTemperature,
                         light.State.Hue,
                         light.State.Saturation,
                         light.State.Brightness,
                         Newtonsoft.Json.JsonConvert.SerializeObject(light.State.ColorCoordinates),
-                        light.State.ToHex()));
+                        light.State.ToHex(),
+                        light.Id));
             }
 
             _logger.LogInformation(sb.ToString());
@@ -105,7 +122,7 @@ namespace Huebert
 
         private void SaveConfig(Configuration config)
         {
-            File.WriteAllText("HuebertConfig.json",Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented));
+            File.WriteAllText("HuebertConfig.json", Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented));
         }
 
         private async Task<string> GetBridgeIP()

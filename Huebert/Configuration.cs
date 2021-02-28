@@ -20,6 +20,8 @@ namespace Huebert
         /// </summary>
         public Location Location { get; set; }
 
+        public SimpleSchedule SimpleSchedule { get; set; }
+
         /// <summary>
         /// Light schedules
         /// </summary>
@@ -45,7 +47,7 @@ namespace Huebert
             config.BridgeInfo = config?.BridgeInfo ?? new BridgeInfo();
             config.Location = config?.Location ?? new Location();
             config.Schedules = config?.Schedules ?? new List<Schedule>();
-
+            config.SimpleSchedule = config?.SimpleSchedule ?? new SimpleSchedule();
             return config;
         }
     }
@@ -79,6 +81,42 @@ namespace Huebert
         /// Location name
         /// </summary>
         public string Name { get; set; }
+    }
+
+    public class SimpleSchedule
+    {
+        /// <summary>
+        /// Schedule name
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// Device ids associated with this schedule
+        /// </summary>
+        public string[] DeviceIds { get; set; }
+
+        /// <summary>
+        /// Daylight color temperature
+        /// </summary>
+        public ushort? DayColorTemperature { get; set; }
+
+        /// <summary>
+        /// SunsetColorTemperature
+        /// </summary>
+        public ushort? SunsetColorTemperature { get; set; }
+
+        /// <summary>
+        /// Default brightness
+        /// </summary>
+        public byte? Brightness { get; set; }
+
+        internal bool IsValid()
+        {
+            return DeviceIds != null &&
+                   Brightness != null &&
+                   DayColorTemperature != null &&
+                   SunsetColorTemperature != null;
+        }
     }
 
     public class Schedule
