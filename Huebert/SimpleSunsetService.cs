@@ -101,11 +101,16 @@ namespace Huebert
 
                 var ctToAdd = Convert.ToInt32(ctDelta * progressInInterval);
 
-                targetCT = (ushort)_config.SimpleSchedule.DayColorTemperature + ctToAdd;
+                targetCT = (ushort)_config.SimpleSchedule.DayColorTemperature - ctToAdd;
+            }
+
+            else if( todaysSunset < now || now < todaysSunrise)
+            {
+                targetCT = (ushort)_config.SimpleSchedule.SunsetColorTemperature;
             }
 
             //Target was set and there exist lights that dont match target.
-            if (targetCT > 0 && lights.Where(i => i.State.ColorTemperature != 1000000 / targetCT).Any())
+            if (targetCT > 0 && lights.Where(i => i.State.On && i.State.ColorTemperature != 1000000 / targetCT).Any())
             {
                 _logger.LogInformation($"Updating light ids [{string.Join(',', _config.SimpleSchedule.DeviceIds)}] to CT {targetCT}K ({1000000 / targetCT})");
                 //var cmd = new LightCommand() { ColorTemperature = 1000000 / (targetCT) };
