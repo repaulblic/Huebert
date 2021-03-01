@@ -12,11 +12,13 @@ namespace Huebert
     //Add method to override/pause timer
     class SimpleSunsetService
     {
+        private Dictionary<string, State> stateTracker;
         private ILocalHueClient _client;
         private DateTime todaysGoldenSet, todaysSunset, todaysSunrise, todaysGoldenRise;
         private Configuration _config;
         Timer timeSetter;
         Timer lightSetter;
+        Timer stateTrackerTimer;
         ILogger _logger;
 
         public SimpleSunsetService(ILogger logger, ILocalHueClient hueClient, Configuration config)
@@ -30,15 +32,15 @@ namespace Huebert
             todaysGoldenRise = AstroTime.GetDawnTime(today, (float)config.Location.Lat, (float)config.Location.Lon, SolarElevation.GOLDEN_HOUR);
             _config = config;
             _logger = logger;
-
+            InitializeStateTracker();
             _logger.LogInformation(string.Format("Set todays Sunrise to {0}", todaysSunrise));
             _logger.LogInformation(string.Format("Set todays GoldenRise to {0}", todaysGoldenRise));
             _logger.LogInformation(string.Format("Set todays GoldenSet to {0}", todaysGoldenSet));
             _logger.LogInformation(string.Format("Set todays Sunset to {0}", todaysSunset));
 
             timeSetter = new Timer(SetTimesForDay, null, 60 * 60 * 1000, 60 * 60 * 1000);
-
             lightSetter = new Timer(CheckForLightUpdate, null, 0, 1 * 60 * 1000);
+            stateTrackerTimer = new Timer(UpdateStateTracker, null, 0, 1 * 1000);
         }
 
         private void SetTimesForDay(Object source)
@@ -113,10 +115,52 @@ namespace Huebert
             if (targetCT > 0 && lights.Where(i => i.State.On && i.State.ColorTemperature != 1000000 / targetCT).Any())
             {
                 _logger.LogInformation($"Updating light ids [{string.Join(',', _config.SimpleSchedule.DeviceIds)}] to CT {targetCT}K ({1000000 / targetCT})");
-                //var cmd = new LightCommand() { ColorTemperature = 1000000 / (targetCT) };
-                //await _client.SendCommandAsync(cmd, _config.SimpleSchedule.DeviceIds);
+                var cmd = new LightCommand() { ColorTemperature = 1000000 / (targetCT), TransitionTime = TimeSpan.FromMilliseconds(400) };
+                await _client.SendCommandAsync(cmd, _config.SimpleSchedule.DeviceIds);
             }
 
+        }
+
+        private async void InitializeStateTracker()
+        {
+            stateTracker = new Dictionary<string, State>();
+            
+            var lights = await _client.GetLightsAsync();
+            foreach (var light in lights)
+            {
+                stateTracker.Add(light.Id, light.State);
+            }
+        }
+
+        private async void UpdateStateTracker(object source)
+        {
+            var lights = await _client.GetLightsAsync();
+            lights = lights.Where(i => _config.SimpleSchedule.DeviceIds.Contains(i.Id));
+
+            bool forceAnUpdate = false;
+
+            foreach (var light in lights)
+            {
+                if (!stateTracker.ContainsKey(light.Id))
+                {
+                    stateTracker.Add(light.Id, light.State);
+                    continue;
+                }
+
+                var lastState = stateTracker[light.Id];
+
+                if(!lastState.On && light.State.On)
+                {
+                    forceAnUpdate = true;
+                }
+
+                stateTracker[light.Id] = light.State;
+            }
+
+            if (forceAnUpdate)
+            {
+                CheckForLightUpdate(source);
+            }
         }
 
     }
